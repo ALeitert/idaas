@@ -43,3 +43,13 @@ curl localhost:8080 -v
 
 The ID itself is (roughly) the current timestamp with nanosecond precision.
 By using atomics, the generator can ensure unique IDs while also being wait free.
+
+### v1.0
+
+The API returns the timestamp itself.
+
+### v1.1
+
+To avoid exposing the creation time of an ID and have it more "random" instead (similar to v4-UUIDs), `v1.1` hashes the created ID with [XXH3](https://github.com/cyan4973/xxhash) and a secret seed.
+Note that the seed is hard-coded and you need to replace it with your own.
+Since XXH3 is bijective for 64-bit inputs (see https://github.com/Cyan4973/xxHash/issues/236#issuecomment-522051621), it is still guaranteed that no ID is produced twice.

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"net"
@@ -13,6 +14,8 @@ import (
 	"sync/atomic"
 	"syscall"
 	"time"
+
+	"github.com/zeebo/xxh3"
 )
 
 func main() {
@@ -71,6 +74,10 @@ func main() {
 	}
 }
 
+const (
+	XXH3Seed uint64 = 0x2976F7650A9017AE // TODO: Replace with your own.
+)
+
 // Stores the last assigned ID as timestamp where one unit is equal to 1 ns.
 // "Overflows" on 2262-04-11 23:47:16.854775807 UTC.
 var usedID atomic.Int64
@@ -86,7 +93,18 @@ func handleRequest(w http.ResponseWriter, _ *http.Request) {
 		nextID = usedID.Add(1)
 	}
 
+	buffer := make([]byte, 8)
+	binary.LittleEndian.PutUint64(buffer, uint64(nextID)) // Native on most machines.
+
+	// XXH3 is bijective for 64-bit inputs. It guarantees no collision.
+	// https://github.com/Cyan4973/xxHash/issues/236#issuecomment-522051621
+	hashID := xxh3.HashSeed(buffer, XXH3Seed)
+
+	fullStr := []byte("0000000000000000")
+	nextStr := []byte(strconv.FormatUint(hashID, 16))
+	copy(fullStr[16-len(nextStr):16], nextStr)
+
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte(strconv.FormatInt(nextID, 10)))
+	_, _ = w.Write(fullStr)
 }
